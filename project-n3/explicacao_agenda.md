@@ -10,13 +10,11 @@
 
 O programa é uma **agenda de contatos via console**. Ele permite:
 
-- Incluir contatos (nome e telefone obrigatórios; e-mail, cidade e empresa opcionais)
+- Incluir contatos (nome e telefone obrigatórios; e-mail opcional)
 - Listar todos os contatos cadastrados
-- Consultar contatos pelo nome (com busca parcial — não precisa digitar o nome completo)
+- Consultar contatos pelo nome
 - Excluir um contato
-- Alterar um contato já cadastrado *(bônus)*
-- Ordenar alfabeticamente *(bônus)*
-- Salvar e carregar dados em arquivo `.txt` *(bônus)*
+- Salvar e carregar dados automaticamente em arquivo `.txt` *(bônus)*
 
 ---
 
@@ -24,101 +22,89 @@ O programa é uma **agenda de contatos via console**. Ele permite:
 
 | Conceito | Onde no código |
 |---|---|
-| Variáveis | `totalContatos`, `opcao`, `indice`, `i`, `j`… |
+| Variáveis | `total`, `opcao`, `indice`, `i`, `encontrou`… |
 | Entrada e saída | `scanf()`, `fgets()`, `printf()`, `fprintf()` |
-| Operadores aritméticos | `i < totalContatos - 1`, `totalContatos++`, `totalContatos--` |
+| Operadores aritméticos | `i < total - 1`, `total++`, `total--` |
 | Estrutura condicional (`if/else`) | Verificar agenda cheia, confirmação de exclusão, campos vazios |
-| Estrutura de seleção (`switch`) | Menu principal (`case 1` a `case 6`) |
-| Estruturas de repetição | `do-while` no loop principal; `for` para percorrer o vetor |
-| Vetores | `Contato agenda[MAX_CONTATOS]` — vetor de structs |
+| Estrutura de seleção (`switch`) | Menu principal (`case 1` a `case 5`) |
+| Estruturas de repetição | `do-while` no loop principal; `for` para percorrer os vetores |
+| Vetores | `nomes[MAX][60]`, `telefones[MAX][20]`, `emails[MAX][60]` |
 | Funções | `incluirContato()`, `listarContatos()`, `excluirContato()`… |
-| Strings (vetores de char) | `nome[60]`, `telefone[20]`, `fgets()`, `strcpy()`, `strcmp()` |
-| `typedef struct` *(bônus)* | `typedef struct { ... } Contato;` |
-| `string.h` *(bônus)* | `strcpy`, `strcmp`, `strlen`, `strstr`, `strcspn` |
+| Strings (vetores de char) | `busca[60]`, `fgets()`, `strcpy()`, `strcmp()`, `strlen()` |
+| `string.h` *(bônus)* | `strcpy`, `strcmp`, `strlen`, `strcspn` |
 | Arquivos *(bônus)* | `salvarArquivo()` e `carregarArquivo()` com `FILE *`, `fopen`, `fclose` |
-| Ordenação Bubble Sort *(bônus)* | `ordenarContatos()` |
+| Melhorias visuais *(bônus)* | Cabeçalhos com `===` e separadores `---` em todas as telas |
 
 ---
 
 ## 3. Como o código foi construído — passo a passo
 
-### Passo 1 — Definir os dados com `typedef struct`
+### Passo 1 — Definir os vetores globais
 
-Antes de escrever qualquer função, definimos **qual informação cada contato vai guardar**:
+Ao invés de uma struct, usamos **três vetores separados** — um para cada campo do contato:
 
 ```c
-typedef struct {
-    char nome[60];
-    char telefone[20];
-    char email[60];
-    char cidade[40];
-    char empresa[60];
-} Contato;
+#define MAX 100
+
+char nomes[MAX][60];
+char telefones[MAX][20];
+char emails[MAX][60];
+int total = 0;
 ```
 
-**Por que `struct`?**  
-Sem struct, precisaríamos de um vetor separado para cada campo:
-`char nomes[100][60]`, `char telefones[100][20]`…  
-Com struct, agrupamos tudo em um único tipo: `Contato agenda[100]`.
+**Como funciona o vetor bidimensional?**  
+`nomes[MAX][60]` é um vetor de 100 posições, onde cada posição guarda uma string de até 60 caracteres.  
+- `nomes[0]` → nome do primeiro contato  
+- `nomes[1]` → nome do segundo contato  
+- E assim por diante...
 
-**Por que `typedef`?**  
-Permite escrever `Contato` em vez de `struct Contato` em todo o código.
+`total` controla quantos contatos existem. Funciona como um marcador da próxima posição vazia:
+- Ao incluir: preenchemos `nomes[total]` e depois `total++`
+- Ao excluir: movemos os elementos e depois `total--`
 
 ---
 
-### Passo 2 — Criar o vetor global e o contador
-
-```c
-Contato agenda[MAX_CONTATOS];  /* vetor de 100 contatos */
-int totalContatos = 0;         /* quantos estão cadastrados */
-```
-
-O vetor é **global** para que todas as funções consigam acessá-lo sem precisar passá-lo como parâmetro.  
-`totalContatos` funciona como um "ponteiro para a próxima posição vazia":  
-- Ao incluir: preenchemos `agenda[totalContatos]` e depois `totalContatos++`  
-- Ao excluir: movemos os elementos e depois `totalContatos--`
-
----
-
-### Passo 3 — Montar o menu com `switch` dentro de `do-while`
+### Passo 2 — Montar o menu com `switch` dentro de `do-while`
 
 ```c
 do {
     exibirMenu();
     scanf("%d", &opcao);
-    limparBuffer();
 
     switch (opcao) {
         case 1: incluirContato();   break;
         case 2: listarContatos();   break;
-        /* ... */
-        case 0: /* sair */ break;
+        case 3: consultarContato(); break;
+        case 4: excluirContato();   break;
+        case 5: /* sair */          break;
     }
-} while (opcao != 0);
+} while (opcao != 5);
 ```
 
 **Por que `do-while` e não `while`?**  
 O `do-while` executa o bloco **pelo menos uma vez** antes de checar a condição.  
 Isso garante que o menu apareça na tela antes de qualquer verificação.
 
-**Por que `limparBuffer()` após `scanf`?**  
+**Por que `scanf(" ")` antes do `fgets`?**  
 O `scanf("%d", &opcao)` lê o número mas deixa o `\n` (Enter) no buffer.  
-Se não limparmos, o próximo `fgets()` vai "engolir" esse Enter e parecer que o usuário não digitou nada.
+O `scanf(" ")` consome esse Enter para que o próximo `fgets` funcione corretamente.
 
 ---
 
-### Passo 4 — Implementar `incluirContato()`
+### Passo 3 — Implementar `incluirContato()`
 
 ```c
-void incluirContato(void) {
-    if (totalContatos >= MAX_CONTATOS) { /* agenda cheia */ return; }
+void incluirContato() {
+    if (total >= MAX) { /* agenda cheia */ return; }
 
-    fgets(agenda[totalContatos].nome, TAM_NOME, stdin);
-    agenda[totalContatos].nome[strcspn(agenda[totalContatos].nome, "\n")] = '\0';
+    printf("Nome: ");
+    scanf(" ");
+    fgets(nomes[total], 60, stdin);
+    nomes[total][strcspn(nomes[total], "\n")] = '\0';
 
-    /* ... lê os outros campos ... */
+    /* ... lê telefone e email da mesma forma ... */
 
-    totalContatos++;
+    total++;
     salvarArquivo();
 }
 ```
@@ -130,95 +116,76 @@ Ao colocar `'\0'` nessa posição, "cortamos" o `\n` da string.
 
 ---
 
-### Passo 5 — Excluir com deslocamento do vetor
+### Passo 4 — Excluir com deslocamento do vetor
 
 Não existe "apagar uma posição" em um vetor C.  
 A técnica correta é **mover todos os elementos seguintes uma posição para trás**:
 
 ```
-Antes:  [Ana][Bruno][Carlos][Diana]   (excluindo Bruno, índice 1)
-Passo:  [Ana][Carlos][Carlos][Diana]  (copia Carlos para posição 1)
-Passo:  [Ana][Carlos][Diana][Diana]   (copia Diana para posição 2)
-Depois: [Ana][Carlos][Diana]          (totalContatos--)
+Antes:  [Ana][Bruno][Carlos]   (excluindo Bruno, índice 1)
+Passo:  [Ana][Carlos][Carlos]  (copia Carlos para posição 1)
+Depois: [Ana][Carlos]          (total--)
 ```
 
 ```c
-for (i = indice; i < totalContatos - 1; i++)
-    agenda[i] = agenda[i + 1];
-totalContatos--;
-```
-
----
-
-### Passo 6 — Busca parcial sem diferenciar maiúsculas
-
-Para permitir digitar "ana" e encontrar "Ana Paula":
-
-1. Convertemos a busca e o nome para minúsculas com `tolower()`
-2. Usamos `strstr()` para verificar se a busca está **contida** no nome
-
-```c
-/* strstr(haystack, needle) retorna ponteiro se needle está em haystack */
-if (strstr(nomeMin, buscaMin) != NULL) {
-    /* encontrou */
+for (i = indice; i < total - 1; i++) {
+    strcpy(nomes[i],     nomes[i + 1]);
+    strcpy(telefones[i], telefones[i + 1]);
+    strcpy(emails[i],    emails[i + 1]);
 }
+total--;
 ```
+
+Usamos `strcpy` aqui pois strings em C não podem ser copiadas com `=` diretamente.
 
 ---
 
-### Passo 7 — Ordenar com Bubble Sort
+### Passo 5 — Salvar e carregar arquivo *(bônus)*
 
-O Bubble Sort compara pares adjacentes e troca os que estão fora de ordem, repetindo até o vetor estar ordenado:
-
-```
-Vetor:    [Carlos][Ana][Diana][Bruno]
-Passagem 1: Carlos > Ana → troca → [Ana][Carlos][Diana][Bruno]
-            Carlos < Diana → não troca
-            Diana > Bruno → troca → [Ana][Carlos][Bruno][Diana]
-Passagem 2: Carlos > Bruno → troca → [Ana][Bruno][Carlos][Diana]
-Resultado: [Ana][Bruno][Carlos][Diana] ✓
-```
+**Salvar** — chamado após incluir e excluir. Sobrescreve o arquivo com todos os contatos:
 
 ```c
-for (i = 0; i < totalContatos - 1; i++) {
-    for (j = 0; j < totalContatos - 1 - i; j++) {
-        if (strcmp(agenda[j].nome, agenda[j+1].nome) > 0) {
-            temp = agenda[j];
-            agenda[j] = agenda[j+1];
-            agenda[j+1] = temp;
-        }
+void salvarArquivo() {
+    FILE *arquivo;
+    int i;
+
+    arquivo = fopen("agenda.txt", "w"); /* "w" = escrita */
+    if (arquivo == NULL) return;
+
+    for (i = 0; i < total; i++) {
+        fprintf(arquivo, "%s\n", nomes[i]);
+        fprintf(arquivo, "%s\n", telefones[i]);
+        fprintf(arquivo, "%s\n", emails[i]);
+        fprintf(arquivo, "---\n"); /* separador */
     }
+
+    fclose(arquivo); /* sempre fechar! */
 }
 ```
 
----
-
-### Passo 8 — Salvar e carregar arquivo
-
-**Salvar** — sobrescreve o arquivo com todos os contatos:
+**Carregar** — chamado no início do `main()`. Lê os dados salvos:
 
 ```c
-FILE *arquivo = fopen("agenda.txt", "w");
-for (i = 0; i < totalContatos; i++) {
-    fprintf(arquivo, "%s\n", agenda[i].nome);
-    fprintf(arquivo, "%s\n", agenda[i].telefone);
-    /* ... outros campos ... */
-    fprintf(arquivo, "---\n");  /* separador */
+void carregarArquivo() {
+    FILE *arquivo;
+    char linha[60];
+
+    arquivo = fopen("agenda.txt", "r"); /* "r" = leitura */
+    if (arquivo == NULL) return; /* arquivo não existe ainda, tudo bem */
+
+    while (total < MAX) {
+        if (fgets(linha, 60, arquivo) == NULL) break;
+        linha[strcspn(linha, "\n")] = '\0';
+        strcpy(nomes[total], linha);
+
+        /* ... lê telefone e email da mesma forma ... */
+
+        fgets(linha, 60, arquivo); /* pula a linha "---" */
+        total++;
+    }
+
+    fclose(arquivo);
 }
-fclose(arquivo);
-```
-
-**Carregar** — lê o arquivo ao iniciar o programa:
-
-```c
-FILE *arquivo = fopen("agenda.txt", "r");
-if (arquivo == NULL) return;  /* arquivo não existe ainda */
-
-while (fgets(linha, ..., arquivo) != NULL) {
-    /* lê os campos na mesma ordem que foram salvos */
-    totalContatos++;
-}
-fclose(arquivo);
 ```
 
 O arquivo `agenda.txt` fica na mesma pasta do executável e tem este formato:
@@ -227,42 +194,34 @@ O arquivo `agenda.txt` fica na mesma pasta do executável e tem este formato:
 Ana Paula
 (47) 99999-1111
 ana@email.com
-Joinville
-EMBRACO
 ---
 Bruno Silva
 (47) 88888-2222
 
-
-Tech Corp
 ---
 ```
+
+**O que saber explicar sobre arquivos na auditoria:**
+- `fopen` abre o arquivo; `fclose` fecha — **sempre fechar**
+- `"w"` sobrescreve tudo; `"r"` só lê
+- `fprintf` é igual ao `printf` mas escreve no arquivo
+- `fgets` retorna `NULL` quando chega no fim do arquivo — por isso usamos no `while`
 
 ---
 
 ## 4. Como compilar e executar
 
-### No Linux / macOS (terminal):
-
-```bash
-# Compilar (com flags que mostram todos os avisos):
-gcc -ansi -Wall -Wextra -o agenda agenda_contatos.c
-
-# Executar:
-./agenda
-```
-
-### No Windows (prompt de comando com MinGW/GCC instalado):
+### No Windows (MinGW/GCC):
 
 ```cmd
-gcc -ansi -Wall -Wextra -o agenda.exe agenda_contatos.c
+gcc -Wall -Wextra -o agenda.exe agenda_bonus.c
 agenda.exe
 ```
 
 ### No Code::Blocks:
 
 1. Crie um novo projeto **Console Application → C**
-2. Substitua o conteúdo do `main.c` pelo arquivo `agenda_contatos.c`
+2. Substitua o conteúdo do `main.c` pelo arquivo `agenda_bonus.c`
 3. Clique em **Build and Run** (F9)
 
 ---
@@ -273,19 +232,14 @@ agenda.exe
 |---|---|
 | `main()` | Ponto de entrada; carrega arquivo; loop do menu |
 | `exibirMenu()` | Imprime o menu visual no console |
-| `incluirContato()` | Lê os dados e adiciona ao vetor |
+| `incluirContato()` | Lê os dados e adiciona aos vetores |
 | `listarContatos()` | Percorre e exibe todos os contatos |
-| `consultarContato()` | Busca parcial por nome e exibe resultados |
-| `excluirContato()` | Busca, confirma e remove deslocando o vetor |
-| `alterarContato()` | Busca e atualiza campos mantendo os que ficaram em branco |
-| `ordenarContatos()` | Bubble Sort alfabético |
+| `consultarContato()` | Busca por nome exato e exibe resultados |
+| `excluirContato()` | Busca, confirma e remove deslocando os vetores |
 | `salvarArquivo()` | Grava todos os contatos em `agenda.txt` |
-| `carregarArquivo()` | Lê `agenda.txt` ao iniciar |
-| `exibirContato(i)` | Exibe os dados formatados de um contato específico |
-| `buscarPorNome(s)` | Retorna o índice do primeiro contato que contém a string `s` |
-| `limparTela()` | Chama `cls` ou `clear` conforme o sistema |
+| `carregarArquivo()` | Lê `agenda.txt` ao iniciar o programa |
+| `limparTela()` | Chama `cls` para limpar o console |
 | `pausar()` | Espera o usuário pressionar Enter |
-| `limparBuffer()` | Descarta o `\n` que fica no buffer após `scanf` |
 
 ---
 
@@ -304,15 +258,11 @@ agenda.exe
 
 ### Bônus implementados (até +3,0 pontos):
 
-| Funcionalidade | Status |
-|---|---|
-| Gravação e leitura em arquivo | ✅ |
-| `typedef struct` | ✅ |
-| `string.h` | ✅ |
-| Alteração de contatos | ✅ |
-| Pesquisa parcial pelo nome | ✅ |
-| Ordenação alfabética | ✅ |
-| Melhorias visuais (bordas no menu) | ✅ |
+| Funcionalidade | Pontos | Status |
+|---|---|---|
+| Gravação e leitura em arquivo | até 2,0 | ✅ |
+| Uso da biblioteca `string.h` | até 0,5 | ✅ |
+| Melhorias visuais na interface | até 0,5 | ✅ |
 
 ---
 
@@ -320,14 +270,16 @@ agenda.exe
 
 O professor pode perguntar sobre qualquer parte do código. Estude especialmente:
 
-- **O que é um vetor?** — Uma sequência de elementos do mesmo tipo, acessados por índice (`agenda[0]`, `agenda[1]`…)
-- **O que é uma struct?** — Um agrupamento de variáveis de tipos diferentes sob um mesmo nome
-- **Por que usar funções?** — Organização, reuso de código, facilita a leitura e manutenção
-- **Como funciona o `fgets` vs `scanf`?** — `scanf` para números; `fgets` para strings com espaço
-- **Por que limpar o buffer?** — Para não "sujar" a próxima leitura de entrada
-- **Como funciona a exclusão no vetor?** — Deslocamento dos elementos seguintes
-- **O que é o `strstr`?** — Função de `string.h` que verifica se uma string está contida em outra
-- **O que significa `-ansi -Wall -Wextra` no gcc?** — Compilar com padrão C89/C90 e mostrar todos os avisos
+- **O que é um vetor?** — Uma sequência de elementos do mesmo tipo, acessados por índice (`nomes[0]`, `nomes[1]`…)
+- **O que é um vetor bidimensional?** — Um vetor onde cada posição guarda outro vetor; no caso, cada posição guarda uma string (`nomes[100][60]`)
+- **Por que usar funções?** — Organização, cada função faz uma coisa só, facilita encontrar erros
+- **Como funciona o `fgets` vs `scanf`?** — `scanf` para números; `fgets` para strings que podem ter espaço
+- **Por que o `scanf(" ")` antes do `fgets`?** — Para consumir o Enter que sobrou do `scanf` anterior
+- **Como funciona a exclusão no vetor?** — Não apagamos; deslocamos os elementos seguintes uma posição para trás
+- **O que é `strcpy`?** — Copia uma string para outra (não podemos usar `=` com strings em C)
+- **O que é `strcmp`?** — Compara duas strings; retorna 0 se forem iguais
+- **O que é `FILE *`?** — Um tipo que representa um arquivo aberto no programa
+- **Por que sempre fechar o arquivo com `fclose`?** — Para garantir que os dados foram gravados e liberar o arquivo para outros programas usarem
 
 ---
 
